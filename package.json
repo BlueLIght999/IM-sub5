@@ -1,0 +1,12 @@
+{
+  "name": "lab5-search",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node test/smoke.js && node --test test/search-core.test.cjs test/mcp.test.cjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "zod": "3.25.76"
+  }
+}

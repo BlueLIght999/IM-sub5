@@ -1,0 +1,8 @@
+[
+  {"caseId":"B1","userInput":"深度学习 AND 神经网络","model":"boolean","query":"深度学习 AND 神经网络","relevantIds":["11","13","14","15","18"]},
+  {"caseId":"B2","userInput":"找物联网资料，排除智能家居，最多5条","model":"boolean","query":"物联网 NOT 智能家居","topK":5,"relevantIds":["37","39","40","41","42"],"excludedIds":["38"]},
+  {"caseId":"N1","userInput":"我想了解怎么防范黑客入侵","model":"bm25","query":"黑客入侵 防火墙 入侵检测","relevantIds":["49","50","52","53","54"]},
+  {"caseId":"N2","userInput":"怎么处理模型在训练数据上表现很好，换一批数据就变差的问题","model":"bm25","query":"过拟合 正则化","relevantIds":["7","10","16"]},
+  {"caseId":"N3","userInput":"我想知道有哪些低功耗的联网设备通信方式","model":"bm25","query":"低功耗 物联网 通信协议","relevantIds":["40"]},
+  {"caseId":"E1","userInput":"zzzznonexistentxyz","model":"bm25","query":"zzzznonexistentxyz","relevantIds":[]}
+]

@@ -1,0 +1,8 @@
+- insert:
+    - id: mcp-lab5
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: lab5
+        transport: stdio
+        command: node
+        args: ['D:/lab5/server/mcp-server.cjs']

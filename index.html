@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>信息检索实验 · 布尔 / 向量 / 概率模型检索系统</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-row">
+      <div>
+        <h1>信息检索实验：三种经典模型检索系统</h1>
+        <div class="subtitle">布尔模型（倒排索引）· 向量空间模型（TF-IDF + 余弦）· 概率模型（BM25） — 纯前端实现，无第三方依赖，双击即可运行</div>
+      </div>
+      <button class="btn" id="btnTheme">🌙 暗色</button>
+    </div>
+    <div class="ds-bar">
+      <button class="btn" id="btnLoadSample">加载示例数据集（中文 60 篇）</button>
+      <button class="btn" id="btnLoadPubmed">加载 PubMed 文献数据集</button>
+      <button class="btn" id="btnUpload">上传 CSV 文件…</button>
+      <input type="file" id="fileInput" accept=".csv,text/csv" style="display:none">
+      <span class="stat">数据集：<b id="dsName">—</b></span>
+      <span class="stat">文档数 <b id="statDocs">0</b></span>
+      <span class="stat">词项数 <b id="statTerms">0</b></span>
+      <span class="stat">平均文档长度 <b id="statAvgdl">0</b></span>
+      <div class="ds-note" id="statCols"></div>
+    </div>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="search">检索</button>
+      <button class="tab-btn" data-tab="index">词典与倒排索引</button>
+      <button class="tab-btn" data-tab="eval">性能评测</button>
+      <button class="tab-btn" data-tab="doc">模型说明</button>
+    </nav>
+  </header>
+
+  <!-- ================= 检索 ================= -->
+  <section class="tab-panel active" id="panel-search">
+    <div class="card">
+      <h3>① 选择检索模型</h3>
+      <div class="model-row">
+        <label class="model-card">
+          <input type="radio" name="model" value="boolean">
+          <div class="mname">布尔模型</div>
+          <div class="mdesc">倒排索引 · AND / OR / NOT 逻辑运算，结果无序</div>
+        </label>
+        <label class="model-card">
+          <input type="radio" name="model" value="vector">
+          <div class="mname">向量空间模型</div>
+          <div class="mdesc">TF-IDF 加权 · 余弦相似度排序</div>
+        </label>
+        <label class="model-card sel">
+          <input type="radio" name="model" value="bm25" checked>
+          <div class="mname">概率模型（BM25）</div>
+          <div class="mdesc">Okapi BM25 排序函数，参数 k1 / b 可调</div>
+        </label>
+      </div>
+      <div class="search-row">
+        <input id="qInput" placeholder="输入查询，如：深度学习 AND 神经网络；图像识别 目标检测；artificial intelligence">
+        <button class="btn btn-primary" id="btnSearch">检索</button>
+      </div>
+      <div class="opts">
+        <label>返回条数
+          <select id="selK">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </label>
+        <label><input type="checkbox" id="chkStem" checked> 英文词干化（Porter）</label>
+        <span id="bm25Box">
+          <span class="param">k1（词频饱和）：<input type="range" id="k1Range" min="0.2" max="3" step="0.1" value="1.2"><b id="k1Val">1.2</b></span>
+          <span class="param">b（长度归一）：<input type="range" id="bRange" min="0" max="1" step="0.05" value="0.75"><b id="bVal">0.75</b></span>
+        </span>
+      </div>
+      <div class="hint">布尔查询支持 <code>AND</code> / <code>OR</code> / <code>NOT</code> 与括号，多个词之间空格默认为 AND。中文按“单字 + 相邻二元组”切分，重叠二元组求交等价于短语匹配。</div>
+      <div class="chips" id="chipsRow"></div>
+      <div class="msg" id="searchMsg"></div>
+    </div>
+    <div class="results-head" id="resultsHead"></div>
+    <div id="resultsList"></div>
+  </section>
+
+  <!-- ================= 词典与倒排索引 ================= -->
+  <section class="tab-panel" id="panel-index">
+    <div class="card">
+      <h3>词典与倒排索引</h3>
+      <input class="idx-filter" id="idxFilter" placeholder="筛选词项，如：深度学习 / cell">
+      <div class="idx-count" id="idxCount"></div>
+      <div style="overflow:auto">
+        <table>
+          <thead><tr><th>词项</th><th>文档频率 df</th><th>df/N</th><th>倒排记录（文档 id，前 10 个）</th></tr></thead>
+          <tbody id="idxRows"></tbody>
+        </table>
+      </div>
+      <div id="postingsBox">点击上方词项可查看完整倒排记录（含各文档词频）。</div>
+    </div>
+  </section>
+
+  <!-- ================= 性能评测 ================= -->
+  <section class="tab-panel" id="panel-eval">
+    <div class="card">
+      <h3>评测集</h3>
+      <div class="hint" id="evalHint"></div>
+      <div class="opts" style="margin-top:8px">
+        <button class="btn btn-primary" id="btnRunStd">运行标准评测（10 条查询）</button>
+        <span class="hint" style="margin:0" id="evalMeta"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>自定义评测（自定义查询 + 相关性标注）</h3>
+      <textarea id="customArea" placeholder="每行一条：查询词 | 相关文档id,用逗号分隔&#10;例如：&#10;深度学习 神经网络 | 11,13,14,15,16,17,18&#10;artificial intelligence | 37649608,34599079"></textarea>
+      <div class="opts" style="margin-top:8px">
+        <button class="btn" id="btnRunCustom">运行自定义评测</button>
+        <span class="msg" id="customMsg" style="margin:0"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>总体指标（对评测集取平均）</h3>
+      <table>
+        <thead><tr><th>指标</th><th>布尔模型</th><th>向量空间模型</th><th>概率模型 BM25</th></tr></thead>
+        <tbody id="evalSummaryRows"></tbody>
+      </table>
+      <div class="eval-grid">
+        <div class="chart-box"><canvas id="barChart"></canvas><div class="viz-tip" id="tipBar"></div></div>
+        <div class="chart-box"><canvas id="prChart"></canvas><div class="viz-tip" id="tipPr"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>逐查询明细（展开查看三种模型的前 10 条检索结果，✓ 为相关文档）</h3>
+      <div id="evalDetail"></div>
+    </div>
+  </section>
+
+  <!-- ================= 模型说明 ================= -->
+  <section class="tab-panel" id="panel-doc">
+    <div class="card doc-sec">
+      <h3>三种检索模型原理</h3>
+      <div class="two-col">
+        <div>
+          <h4>布尔模型（Boolean Model）</h4>
+          <p>文档表示为<b>词项集合</b>，查询为词项构成的<b>布尔表达式</b>：</p>
+          <div class="formula">q = t1 ∧ (t2 ∨ ¬t3)          （AND / OR / NOT）</div>
+          <ul>
+            <li>匹配：表达式在文档词项集上为真 → 相关（1），否则不相关（0）</li>
+            <li>实现：<b>倒排索引</b>（词典 + 倒排记录表），AND=交集、OR=并集、NOT=补集</li>
+            <li>优点：实现简单、速度快、逻辑直观；缺点：无相关性排序、不能部分匹配、查全率低</li>
+            <li>本系统中布尔结果按“匹配词项累计词频”排序，仅为展示与评测需要</li>
+          </ul>
+        </div>
+        <div>
+          <h4>向量空间模型（Vector Space Model, Salton）</h4>
+          <p>文档与查询都表示为<b>词项权重向量</b>，按夹角余弦排序：</p>
+          <div class="formula">w(t,d) = tf · idf
+tf = 1 + ln(tf)       idf = ln(1 + N/df)
+sim(d,q) = Σ w(t,d)·w(t,q) / (‖d‖·‖q‖)</div>
+          <ul>
+            <li>tf：词频（对数压缩）；idf：逆文档频率，稀有词权重高；L2 归一化消除长文档优势</li>
+            <li>优点：支持部分匹配与连续相关性排序；缺点：词项独立性假设</li>
+          </ul>
+        </div>
+      </div>
+      <div class="two-col">
+        <div>
+          <h4>概率模型（Probabilistic Model, BM25）</h4>
+          <p>以“按相关性概率 P(R|d,q) 排序”为原则，是 BIM（Robertson &amp; Sparck Jones）思想的工程化版本 —— Okapi BM25：</p>
+          <div class="formula">RSV(d,q) = Σ IDF(t) · f(t,d)·(k1+1) / (f(t,d) + k1·(1 − b + b·dl/avgdl))
+IDF(t) = ln((N − df + 0.5) / (df + 0.5) + 1)</div>
+          <ul>
+            <li>k1：词频饱和参数（默认 1.2）；b：文档长度归一化强度（默认 0.75）</li>
+            <li>优点：理论依据严谨、对长文档鲁棒、工业界标准；本页可拖动滑条实时观察参数影响</li>
+          </ul>
+        </div>
+        <div>
+          <h4>评测指标</h4>
+          <div class="formula">P@k = 前 k 条中相关文档数 / k             （查准率）
+R@k = 前 k 条中相关文档数 / 相关文档总数   （查全率）
+F1  = 2·P·R / (P + R)
+AP  = Σ(命中位置的查准率) / 相关文档总数     （单查询）
+MAP = 所有查询 AP 的均值
+11 点插值 P-R 曲线：P(r) = max P(r′)，r′ ≥ r</div>
+        </div>
+      </div>
+      <h4>实现要点</h4>
+      <ul>
+        <li><b>中文分词</b>：连续汉字串切分为“单字 + 相邻二元组”；查询与文档同规则处理，多个重叠二元组求交集 ≈ 短语匹配，无需外部词典即可工作（可替换为 jieba 等）</li>
+        <li><b>英文处理</b>：小写化 → 停用词过滤 → Porter 词干化（cells→cell），保证查全率</li>
+        <li><b>倒排索引</b>：Map&lt;词项, {df, [{docId, tf}]}&gt;，三种模型共用同一索引</li>
+        <li><b>全部代码</b>：见 <code>js/</code> 目录（utils / porter / tokenizer / index / models / evaluation / data / main），无任何第三方库；可用 <code>node test/smoke.js</code> 无浏览器自测</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>实验5 · 信息检索 · 布尔模型 / 向量空间模型 / 概率模型（BM25）· HTML + JavaScript 实现 · 数据集为 CSV 文件</footer>
+</div>
+
+<script src="js/utils.js"></script>
+<script src="js/porter.js"></script>
+<script src="js/tokenizer.js"></script>
+<script src="js/index.js"></script>
+<script src="js/models.js"></script>
+<script src="js/evaluation.js"></script>
+<script src="js/data.js"></script>
+<script src="js/pubmed.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
