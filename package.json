@@ -3,7 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test": "node test/smoke.js && node --test test/search-core.test.cjs test/mcp.test.cjs"
+    "test": "node test/smoke.js && node --test test/search-core.test.cjs test/mcp.test.cjs",
+    "mcp:config": "node scripts/mcp-config.cjs",
+    "mcp:config:codex": "node scripts/mcp-config.cjs --host codex",
+    "mcp:doctor": "node scripts/mcp-doctor.cjs"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

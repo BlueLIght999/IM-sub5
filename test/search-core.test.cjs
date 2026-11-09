@@ -23,6 +23,52 @@ test('ranked search is repeatable and bounded', () => {
   assert.deepEqual(search({query: 'zzzznonexistentxyz'}).results, []);
 });
 
+test('Boolean scoring preserves semantics without rebuilding postings per hit', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const vm = require('node:vm');
+  const context = vm.createContext({});
+  for (const name of ['utils', 'porter', 'tokenizer', 'index', 'models']) {
+    vm.runInContext(
+      fs.readFileSync(path.join(__dirname, '..', 'js', name + '.js'), 'utf8'),
+      context
+    );
+  }
+  const { IR } = context;
+  const docs = [
+    { id: '10', title: '', content: 'alpha beta' },
+    { id: '2', title: '', content: 'alpha beta' },
+    { id: '3', title: '', content: 'alpha alpha gamma' },
+    { id: '4', title: '', content: 'gamma' }
+  ];
+  const idx = IR.buildIndex(docs, { stem: false });
+  const pairs = result => Array.from(result, row => [row.id, row.score]);
+  assert.deepEqual(pairs(IR.searchBoolean(idx, 'alpha OR alpha')),
+    [['3', 4], ['2', 2], ['10', 2]]);
+  assert.deepEqual(pairs(IR.searchBoolean(idx, 'alpha NOT beta')), [['3', 2]]);
+  assert.deepEqual(pairs(IR.searchBoolean(idx, 'NOT beta')), [['3', 0], ['4', 0]]);
+  assert.deepEqual(pairs(IR.searchBoolean(idx, '(alpha OR gamma) NOT beta')),
+    [['3', 3], ['4', 1]]);
+  assert.deepEqual(pairs(IR.searchBoolean(idx, 'alpha OR gamma NOT beta')),
+    [['3', 3], ['2', 2], ['10', 2], ['4', 1]]);
+  assert.deepEqual(pairs(IR.searchBoolean(idx, 'the')), []);
+  assert.deepEqual(pairs(IR.searchBoolean(idx, 'zzzznonexistentxyz')), []);
+  assert.throws(() => IR.searchBoolean(idx, '(alpha'));
+
+  const originalPostings = IR.termPostings;
+  let calls = 0;
+  IR.termPostings = (index, term) => {
+    calls++;
+    return originalPostings(index, term);
+  };
+  try {
+    IR.searchBoolean(idx, 'alpha OR beta');
+    assert.ok(calls <= 4, 'two terms require at most four postings builds');
+  } finally {
+    IR.termPostings = originalPostings;
+  }
+});
+
 test('invalid input and Boolean expressions fail', () => {
   for (const input of [null, {}, {query:' '}, {query:'x', model:'other'},
     ...[0, 21, 1.5, '5'].map(topK => ({query:'x', topK})),

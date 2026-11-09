@@ -1,7 +1,9 @@
 node_modules/
 .npm-cache/
 dsh.lab5.local.yml
+codex.lab5.mcp.toml
 .dsh-test-home/
 .env
 .env.*
 npm-debug.log*
+~$*.docx

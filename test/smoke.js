@@ -112,6 +112,33 @@ if (fs.existsSync(path.join(root, 'js', 'pubmed.js'))) {
     const indexMs = performance.now() - started;
     check(label + '建索引', pidx.N === docs.length && pidx.docById.size === docs.length,
       pidx.N + ' 篇 / ' + pidx.postings.size + ' 个词项 / ' + indexMs.toFixed(2) + ' ms');
+    // 布尔规模记录：命中集合、累计词频得分与同分排序都应与解析结果一致。
+    // 计时覆盖完整检索（解析 + 打分 + 排序），不含建索引；不设固定毫秒门槛。
+    for (const query of [
+      'drug', 'drug OR evaluation', 'drug AND vaccine',
+      'NOT vaccine', 'drug OR drug'
+    ]) {
+      const run = () => IR.searchBoolean(pidx, query);
+      const hits = run();
+      const times = Array.from({ length: 7 }, () => {
+        const start = performance.now();
+        run();
+        return performance.now() - start;
+      }).sort((a, b) => a - b);
+      const expected = IR.parseBoolean(pidx, query);
+      const terms = IR.extractQueryTerms(query).map(t => IR.termPostings(pidx, t));
+      check('Boolean ' + query,
+        hits.length === expected.size &&
+        new Set(hits.map(hit => hit.id)).size === hits.length &&
+        hits.every((hit, i) =>
+          expected.has(hit.id) &&
+          hit.score === terms.reduce((sum, m) => sum + (m ? m.get(hit.id) || 0 : 0), 0) &&
+          (i === 0 || hits[i - 1].score > hit.score ||
+            (hits[i - 1].score === hit.score &&
+              hits[i - 1].id.localeCompare(hit.id, undefined, { numeric: true }) <= 0))),
+        hits.length + ' hits / median ' + times[3].toFixed(2) +
+          ' ms / Top-5 ' + hits.slice(0, 5).map(hit => hit.id).join(','));
+    }
     for (const query of ['artificial intelligence drug', 'covid-19 vaccine', 'machine learning']) {
       const run = () => IR.searchBM25(pidx, query, 5, 1.2, 0.75);
       const hits = run();

@@ -1,3 +1,6 @@
+# DSH patch 模板。推荐用 `npm run mcp:config` 生成 dsh.lab5.local.yml：
+# 生成器会写入本机 Node 绝对路径与项目绝对路径，不依赖 PATH，也不需要手工替换占位符。
+# 手工使用时，把 command 换成本机 node 绝对路径，并把两处 D:/lab5 换成实际项目路径。
 - insert:
     - id: mcp-lab5
       name: '@deepseek-ai/dsh-mcp-client'
@@ -6,3 +9,4 @@
         transport: stdio
         command: node
         args: ['D:/lab5/server/mcp-server.cjs']
+        cwd: 'D:/lab5'

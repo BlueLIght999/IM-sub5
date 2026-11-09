@@ -169,12 +169,13 @@
    */
   IR.searchBoolean = function (idx, q) {
     const set = IR.parseBoolean(idx, q);
-    const terms = IR.extractQueryTerms(q);
+    const termMaps = IR.extractQueryTerms(q).map(
+      term => IR.termPostings(idx, term)
+    );
     const scored = [];
     for (const id of set) {
       let score = 0;
-      for (const tm of terms) {
-        const m = IR.termPostings(idx, tm);
+      for (const m of termMaps) {
         if (m && m.has(id)) score += m.get(id);
       }
       scored.push({ id: id, score: score });
